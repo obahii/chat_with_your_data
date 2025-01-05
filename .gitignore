@@ -1,53 +1,95 @@
-# Byte-compiled / optimized / compiled files
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*.class
+*$py.class
 
 # C extensions
 *.so
 
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Hidden files and directories (e.g., IDE settings)
-*.swp
-*.swo
-*.idea/
-*.vscode/
-*.DS_Store
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
 
-# Logs and other runtime files
-*.log
-*.out
-*.err
-
-# Environment and dependency files
-env/
-venv/
-.venv/
+# Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
-*.env
-.env
-
-# Distribution / packaging
-*.egg-info/
-*.eggs/
-dist/
-build/
-*.egg
 
 # Unit test / coverage reports
-coverage/
+htmlcov/
+.tox/
+.nox/
+.coverage
 *.cover
 *.py,cover
 .hypothesis/
 .pytest_cache/
+cover/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# dotenv
+.env
+.env.*
+
+# virtualenv
+.venv/
+venv/
+ENV/
+env/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# IDE-specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# macOS files
+.DS_Store
+
+# Windows files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # Temporary files
 *.bak
 *.tmp
 *.temp
-
-# Jupyter Notebook metadata
-*.ipynb-meta
+vector*
+vector*/
+.venvy/
