@@ -51,3 +51,5 @@ coverage/
 
 # Jupyter Notebook metadata
 *.ipynb-meta
+vector_stores/
+.venvy/
