@@ -1,159 +1,129 @@
-from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain_community.llms import HuggingFacePipeline
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
-import torch
+import streamlit as st
+from document_processor import create_vector_store
+from rag_chat import RAGChat
+from styles import get_styles
+from session_state import initialize_session_state
 import os
 
-class RAGDocumentQA:
-    def __init__(self):
-        """
-        Initialize the RAG-based DocumentQA system using local models.
-        """
-        # Initialize text splitter with smaller chunks for better retrieval
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=300,
-            chunk_overlap=30,
-            length_function=len,
-            separators=["\n\n", "\n", " ", ""]
-        )
-        
-        # Initialize embeddings
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="all-MiniLM-L6-v2",
-            model_kwargs={'device': 'cuda' if torch.cuda.is_available() else 'cpu'}
-        )
-        
-        # Initialize language model
-        model_name = "google/flan-t5-small"
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-        
-        # Create pipeline
-        pipe = pipeline(
-            "text2text-generation",
-            model=model,
-            tokenizer=tokenizer,
-            max_length=512,
-            device=0 if torch.cuda.is_available() else -1
-        )
-        
-        # Initialize language model
-        self.llm = HuggingFacePipeline(pipeline=pipe)
-        self.vector_store = None
-        
-        # Create RAG prompt template
-        self.rag_prompt = PromptTemplate(
-            input_variables=["context", "question"],
-            template="""
-            Use the following context to answer the question. 
-            If you can't find the answer in the context, say "I cannot find the answer in the document."
-            
-            Context: {context}
-            
-            Question: {question}
-            
-            Answer:"""
-        )
-        
-        # Initialize LLM Chain
-        self.llm_chain = LLMChain(
-            llm=self.llm,
-            prompt=self.rag_prompt,
-            verbose=False
-        )
-        
-    def load_pdf(self, pdf_path):
-        """
-        Load and process a PDF document.
-        Args:
-            pdf_path (str): Path to the PDF file
-        """
-        try:
-            # Load the PDF
-            loader = PyPDFLoader(pdf_path)
-            pages = loader.load()
-            
-            # Split text into chunks
-            texts = self.text_splitter.split_documents(pages)
-            
-            # Create vector store
-            self.vector_store = FAISS.from_documents(texts, self.embeddings)
-            
-            return True
-        except Exception as e:
-            print(f"Error loading PDF: {str(e)}")
-            return False
-    
-    def ask_question(self, question):
-        """
-        Ask a question about the loaded document using RAG.
-        Args:
-            question (str): Question to ask about the document
-        Returns:
-            str: Answer to the question
-        """
-        if not self.vector_store:
-            return "Please load a PDF document first."
-        
-        try:
-            # Retrieve relevant documents
-            relevant_docs = self.vector_store.similarity_search(question, k=3)
-            
-            # Combine relevant document content
-            context = "\n".join([doc.page_content for doc in relevant_docs])
-            
-            # Get answer using RAG
-            response = self.llm_chain.invoke({
-                "context": context,
-                "question": question
-            })
-            
-            return response["text"]
-            
-        except Exception as e:
-            return f"Error processing question: {str(e)}"
 
 def main():
-    print("RAG-based PDF Q&A System")
-    print("-----------------------")
-    print("Initializing models (this may take a few minutes)...")
-    
-    # Initialize system
-    qa_system = RAGDocumentQA()
-    print("System ready!")
-    
-    while True:
-        print("\nOptions:")
-        print("1. Load PDF document")
-        print("2. Ask question")
-        print("3. Exit")
-        
-        choice = input("\nEnter your choice (1-3): ")
-        
-        if choice == "1":
-            pdf_path = input("Enter PDF file path: ")
-            if qa_system.load_pdf(pdf_path):
-                print("PDF document loaded successfully!")
-            else:
-                print("Failed to load PDF document.")
-                
-        elif choice == "2":
-            question = input("Enter your question: ")
-            print("\nProcessing question...")
-            answer = qa_system.ask_question(question)
-            print("\nAnswer:", answer)
-            
-        elif choice == "3":
-            print("Goodbye!")
-            break
-            
-        else:
-            print("Invalid choice. Please try again.")
+    # Set page config
+    st.set_page_config(
+        page_title="Document Chat",
+        page_icon="📚",
+        layout="wide",
+    )
+
+    # Apply styles
+    st.markdown(get_styles(), unsafe_allow_html=True)
+
+    # Initialize session state
+    initialize_session_state(st)
+
+    # Sidebar for file upload and document selection
+    with st.sidebar:
+        st.title("📚 Document Chat")
+        uploaded_file = st.file_uploader("Upload a PDF document", type="pdf")
+
+        if uploaded_file:
+            try:
+                file_content = uploaded_file.read()
+                vector_store_path = "vector_stores"
+
+                with st.spinner("Processing document..."):
+                    collection_name, doc_path = create_vector_store(
+                        file_content, uploaded_file.name, vector_store_path
+                    )
+                    st.session_state.doc_names[collection_name] = uploaded_file.name
+
+                    if collection_name not in st.session_state.conversations:
+                        st.session_state.conversations[collection_name] = RAGChat(
+                            doc_path, collection_name
+                        )
+                        st.session_state.chat_histories[collection_name] = []
+                        st.success("Document processed successfully!")
+            except FileNotFoundError:
+                st.error("Error: Could not find or access the uploaded file.")
+            except Exception as e:
+                st.error(f"An error occurred while processing the document: {str(e)}")
+                if (
+                    "collection_name" in locals()
+                    and collection_name in st.session_state.doc_names
+                ):
+                    del st.session_state.doc_names[collection_name]
+                if (
+                    "collection_name" in locals()
+                    and collection_name in st.session_state.conversations
+                ):
+                    del st.session_state.conversations[collection_name]
+                if (
+                    "collection_name" in locals()
+                    and collection_name in st.session_state.chat_histories
+                ):
+                    del st.session_state.chat_histories[collection_name]
+
+        # Document list selection
+        if st.session_state.conversations:
+            st.subheader("Available Documents")
+            docs = list(st.session_state.conversations.keys())
+
+            for doc in docs:
+                doc_name = st.session_state.doc_names[doc]
+                is_selected = doc == st.session_state.current_doc
+
+                if st.button(
+                    doc_name,
+                    key=f"doc_{doc}",
+                    help=f"Click to chat with {doc_name}",
+                    use_container_width=True,
+                    type="secondary" if is_selected else "primary",
+                ):
+                    st.session_state.current_doc = doc
+                    st.rerun()
+
+    # Main chat interface
+    if st.session_state.current_doc:
+        st.header(
+            f"Chatting with: {st.session_state.doc_names[st.session_state.current_doc]}"
+        )
+
+        # Display chat history
+        for message in st.session_state.chat_histories[st.session_state.current_doc]:
+            with st.container():
+                st.markdown(
+                    f"""<div class="chat-message">
+                        <strong>{'🤖 Assistant' if message['role'] == 'assistant' else '👤 You'}:</strong><br>
+                        {message['content']}
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+
+        # Chat input
+        user_input = st.chat_input("Ask a question about the document")
+
+        if user_input:
+            # Add user message to history
+            st.session_state.chat_histories[st.session_state.current_doc].append(
+                {"role": "user", "content": user_input}
+            )
+
+            # Get AI response
+            with st.spinner("Thinking..."):
+                rag_chat = st.session_state.conversations[st.session_state.current_doc]
+                response = rag_chat.ask(user_input)
+
+                # Add AI response to history
+                st.session_state.chat_histories[st.session_state.current_doc].append(
+                    {"role": "assistant", "content": response}
+                )
+
+            # Rerun to update the chat display
+            st.rerun()
+    else:
+        st.info(
+            "👈 Please upload a PDF document and select it from the sidebar to start chatting!"
+        )
+
 
 if __name__ == "__main__":
     main()
