@@ -1,0 +1,42 @@
+# Application Configuration
+vector_store_path: "vector_stores"
+log_path: "logs"
+max_workers: 4
+
+# Spark Configuration
+spark:
+  app_name: "DistributedDocChat"
+  driver_memory: "4g"
+  executor_memory: "4g"
+  max_result_size: "2g"
+  # Add more Spark configs as needed
+  config:
+    spark.sql.execution.arrow.pyspark.enabled: true
+    spark.sql.adaptive.enabled: true
+    spark.dynamicAllocation.enabled: true
+    spark.shuffle.service.enabled: true
+
+# Ollama Configuration
+ollama:
+  base_url: "http://localhost:11434"
+  model: "llama2"
+  parameters:
+    temperature: 0.7
+    top_p: 0.9
+    max_tokens: 2000
+
+# Embedding Configuration
+embeddings:
+  model: "all-MiniLM-L6-v2"
+  batch_size: 32
+
+# Vector Store Configuration
+vector_store:
+  similarity_top_k: 3
+  fetch_k: 4
+  
+# Processing Configuration
+processing:
+  chunk_size: 1000
+  chunk_overlap: 200
+  batch_size: 10
